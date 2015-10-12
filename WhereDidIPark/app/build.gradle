@@ -7,7 +7,7 @@ android {
     defaultConfig {
         applicationId "edu.umkc.student.tuhvu.wheredidipark"
         minSdkVersion 9
-        targetSdkVersion 23
+        targetSdkVersion 22
         versionCode 1
         versionName "1.0"
     }

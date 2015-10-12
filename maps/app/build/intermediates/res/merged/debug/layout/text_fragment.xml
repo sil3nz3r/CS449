@@ -4,4 +4,4 @@
   android:layout_height="match_parent"
   android:gravity="center"
   android:text="@string/swipe"
-  android:textColor="@android:color/white"/><!-- From: file:/C:/Users/tuvu2/Documents/GitHub/CS449/maps/app/src/main/res/layout/text_fragment.xml -->
+  android:textColor="@android:color/white"/><!-- From: file:/C:/Users/TV020594/Documents/GitHub/CS449/maps/app/src/main/res/layout/text_fragment.xml -->
