@@ -1,13 +1,12 @@
 package edu.umkc.student.tuhvu.wheredidipark;
 
-import android.app.Activity;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Button;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -66,6 +65,10 @@ public class MainActivity extends FragmentActivity implements
      */
     protected Location mCurrentLocation;
 
+    protected TextView mLastUpdateTimeTextView;
+    protected TextView mLatitudeTextView;
+    protected TextView mLongitudeTextView;
+
     /**
      * Tracks the status of the location updates request. Value changes when the user presses the
      * Start Updates and Stop Updates buttons.
@@ -85,6 +88,10 @@ public class MainActivity extends FragmentActivity implements
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        mLatitudeTextView = (TextView) findViewById(R.id.latitude_text);
+        mLongitudeTextView = (TextView) findViewById(R.id.longitude_text);
+        mLastUpdateTimeTextView = (TextView) findViewById(R.id.last_update_time_text);
 
         mRequestingLocationUpdates = false;
         mLastUpdateTime = "";
@@ -176,6 +183,14 @@ public class MainActivity extends FragmentActivity implements
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
+    public void startUpdatesButtonHandler(View view) {
+        if (!mRequestingLocationUpdates) {
+            mRequestingLocationUpdates = true;
+            startLocationUpdates();
+        }
+        updateUI();
+    }
+
     /**
      * Requests location updates from the FusedLocationApi.
      */
@@ -202,6 +217,12 @@ public class MainActivity extends FragmentActivity implements
      */
     private void updateUI() {
         if (mCurrentLocation != null) {
+            // Update label
+            mLatitudeTextView.setText(String.valueOf(mCurrentLocation.getLatitude()));
+            mLongitudeTextView.setText(String.valueOf(mCurrentLocation.getLongitude()));
+            mLastUpdateTimeTextView.setText(mLastUpdateTime);
+
+            // Update map
             LatLng mLastLocationCoor = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
             mMap.addMarker(new MarkerOptions().position(mLastLocationCoor).title("Marker in KCMO"));
             mMap.moveCamera(CameraUpdateFactory.newLatLng(mLastLocationCoor));
@@ -269,7 +290,6 @@ public class MainActivity extends FragmentActivity implements
             if (mCurrentLocation == null) {
                 Toast.makeText(this, R.string.no_location_detected, Toast.LENGTH_LONG).show();
             }
-        } else {
         }
 
         // If the user presses the Start Updates button before GoogleApiClient connects, we set
