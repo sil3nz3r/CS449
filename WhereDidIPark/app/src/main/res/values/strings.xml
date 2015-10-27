@@ -3,6 +3,7 @@
 
     <string name="action_settings">Settings</string>
 
+    <!--Location related strings-->
     <string name="no_location_detected">
         No location detected. Make sure location is enabled on the device.
     </string>
@@ -10,10 +11,12 @@
     <string name="latitude_label">Latitude: </string>
     <string name="longitude_label">Longitude: </string>
 
-    <string name="start_updates">Start updates</string>
-    <string name="stop_updates">Stop updates</string>
+    <string name="park_the_car_button">Park Here!</string>
 
     <string name="last_update_time_label">Last location update time: </string>
 
     <string name="location_updated_message">Location updated</string>
+
+    <!--Map related strings-->
+    <string name="marker_title">Your car is here!</string>
 </resources>

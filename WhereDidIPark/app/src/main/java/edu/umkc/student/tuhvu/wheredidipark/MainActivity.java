@@ -1,6 +1,8 @@
 package edu.umkc.student.tuhvu.wheredidipark;
 
+import android.content.SharedPreferences;
 import android.location.Location;
+import android.nfc.Tag;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
@@ -20,6 +22,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.text.DateFormat;
@@ -31,7 +34,7 @@ public class MainActivity extends FragmentActivity implements
         LocationListener,
         OnMapReadyCallback {
 
-    protected static final String TAG = "Main Activity";
+    protected static final String TAG = "MainActivity";
 
     /**
      * The desired interval for location updates. Inexact. Updates may be more or less frequent.
@@ -42,10 +45,11 @@ public class MainActivity extends FragmentActivity implements
      * The fastest rate for active location updates. Exact. Updates will never be more frequent
      * than this value.
      */
-    public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS =
-            UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+    public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
 
-    // Keys for storing activity state in the Bundle.
+    /**
+     * Keys for storing activity state in the Bundle.
+     */
     protected final static String REQUESTING_LOCATION_UPDATES_KEY = "requesting-location-updates-key";
     protected final static String LOCATION_KEY = "location-key";
     protected final static String LAST_UPDATED_TIME_STRING_KEY = "last-updated-time-string-key";
@@ -65,6 +69,9 @@ public class MainActivity extends FragmentActivity implements
      */
     protected Location mCurrentLocation;
 
+    /**
+     * View objects
+     */
     protected TextView mLastUpdateTimeTextView;
     protected TextView mLatitudeTextView;
     protected TextView mLongitudeTextView;
@@ -82,7 +89,9 @@ public class MainActivity extends FragmentActivity implements
 
     private GoogleMap mMap;
 
-    private LocationRequest locationRequest;
+    private Marker mMarker;
+
+    private SharedPreferences mainActivityPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,6 +105,8 @@ public class MainActivity extends FragmentActivity implements
         mRequestingLocationUpdates = false;
         mLastUpdateTime = "";
 
+        mainActivityPreferences = this.getSharedPreferences(TAG, MODE_PRIVATE);
+
         // Initiate Google Maps API
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -103,41 +114,11 @@ public class MainActivity extends FragmentActivity implements
 
         // Update values using data stored in the Bundle.
         updateValuesFromBundle(savedInstanceState);
+        updateCoordinatesFromSharedPreferences();
 
         // Kick off the process of building a GoogleApiClient and requesting the LocationServices
         // API.
         buildGoogleApiClient();
-    }
-
-    /**
-     * Updates fields based on data stored in the bundle.
-     *
-     * @param savedInstanceState The activity state saved in the Bundle.
-     */
-    private void updateValuesFromBundle(Bundle savedInstanceState) {
-        Log.i(TAG, "Updating values from bundle");
-        if (savedInstanceState != null) {
-            // Update the value of mRequestingLocationUpdates from the Bundle, and make sure that
-            // the Start Updates and Stop Updates buttons are correctly enabled or disabled.
-            if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
-                mRequestingLocationUpdates = savedInstanceState.getBoolean(
-                        REQUESTING_LOCATION_UPDATES_KEY);
-            }
-
-            // Update the value of mCurrentLocation from the Bundle and update the UI to show the
-            // correct latitude and longitude.
-            if (savedInstanceState.keySet().contains(LOCATION_KEY)) {
-                // Since LOCATION_KEY was found in the Bundle, we can be sure that mCurrentLocation
-                // is not null.
-                mCurrentLocation = savedInstanceState.getParcelable(LOCATION_KEY);
-            }
-
-            // Update the value of mLastUpdateTime from the Bundle and update the UI.
-            if (savedInstanceState.keySet().contains(LAST_UPDATED_TIME_STRING_KEY)) {
-                mLastUpdateTime = savedInstanceState.getString(LAST_UPDATED_TIME_STRING_KEY);
-            }
-            updateUI();
-        }
     }
 
     /**
@@ -179,37 +160,22 @@ public class MainActivity extends FragmentActivity implements
         // Sets the fastest rate for active location updates. This interval is exact, and your
         // application will never receive updates faster than this value.
         mLocationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
-
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
-    public void startUpdatesButtonHandler(View view) {
+    public void ParkButtonHandler(View view) {
         if (!mRequestingLocationUpdates) {
             mRequestingLocationUpdates = true;
             startLocationUpdates();
         }
         updateUI();
+
+        mRequestingLocationUpdates = false;
+        stopLocationUpdates();
     }
 
-    /**
-     * Requests location updates from the FusedLocationApi.
-     */
-    protected void startLocationUpdates() {
-        // The final argument to {@code requestLocationUpdates()} is a LocationListener
-        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
-        if (mGoogleApiClient.isConnected()) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }
-    }
-
-    protected void stopLocationUpdates() {
-        // It is a good practice to remove location requests when the activity is in a paused or
-        // stopped state. Doing so helps battery performance and is especially
-        // recommended in applications that request frequent location updates.
-
-        // The final argument to {@code requestLocationUpdates()} is a LocationListener
-        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
-        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+    public void ClearMapButtonHandler(View view) {
+        mMap.clear();
     }
 
     /**
@@ -222,12 +188,20 @@ public class MainActivity extends FragmentActivity implements
             mLongitudeTextView.setText(String.valueOf(mCurrentLocation.getLongitude()));
             mLastUpdateTimeTextView.setText(mLastUpdateTime);
 
-            // Update map
-            LatLng mLastLocationCoor = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
-            mMap.addMarker(new MarkerOptions().position(mLastLocationCoor).title("Marker in KCMO"));
-            mMap.moveCamera(CameraUpdateFactory.newLatLng(mLastLocationCoor));
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(mLastLocationCoor, 15));
+            // Place the marker for the current location
+            placeMarKer();
         }
+    }
+
+    private void placeMarKer() {
+        // Update map
+        LatLng mLocationCoor = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+        if (mMarker != null) {
+            mMarker.remove();
+        }
+        mMarker = mMap.addMarker(new MarkerOptions().position(mLocationCoor).title(getString(R.string.marker_title)));
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(mLocationCoor));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(mLocationCoor, 15));
     }
 
     @Override
@@ -243,18 +217,19 @@ public class MainActivity extends FragmentActivity implements
         // connection to GoogleApiClient intact.  Here, we resume receiving
         // location updates if the user has requested them.
 
-        if (mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
-            startLocationUpdates();
-        }
+//        if (mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
+//            startLocationUpdates();
+//        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         // Stop location updates to save battery, but don't disconnect the GoogleApiClient object.
-        if (mGoogleApiClient.isConnected()) {
-            stopLocationUpdates();
-        }
+//        if (mGoogleApiClient.isConnected()) {
+//            stopLocationUpdates();
+//        }
+        saveCoordinatesToSharedPreferences();
     }
 
     @Override
@@ -263,6 +238,13 @@ public class MainActivity extends FragmentActivity implements
         if (mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
         }
+        saveCoordinatesToSharedPreferences();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        saveCoordinatesToSharedPreferences();
     }
 
     /**
@@ -307,9 +289,8 @@ public class MainActivity extends FragmentActivity implements
     public void onLocationChanged(final Location location) {
         mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        updateUI();
-        Toast.makeText(this, "Location Updated",
-                Toast.LENGTH_SHORT).show();
+        //updateUI();
+        Toast.makeText(this, "Location Updated", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -327,6 +308,81 @@ public class MainActivity extends FragmentActivity implements
         Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = " + result.getErrorCode());
     }
 
+    /**
+     * Requests location updates from the FusedLocationApi.
+     */
+    protected void startLocationUpdates() {
+        // The final argument to {@code requestLocationUpdates()} is a LocationListener
+        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
+        if (mGoogleApiClient.isConnected()) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+        }
+    }
+
+    protected void stopLocationUpdates() {
+        // It is a good practice to remove location requests when the activity is in a paused or
+        // stopped state. Doing so helps battery performance and is especially
+        // recommended in applications that request frequent location updates.
+
+        // The final argument to {@code requestLocationUpdates()} is a LocationListener
+        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
+        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+    }
+
+    /**
+     * Updates fields based on data stored in the bundle.
+     *
+     * @param savedInstanceState The activity state saved in the Bundle.
+     */
+    private void updateValuesFromBundle(Bundle savedInstanceState) {
+        Log.i(TAG, "Updating values from bundle");
+        if (savedInstanceState != null) {
+            // Update the value of mRequestingLocationUpdates from the Bundle, and make sure that
+            // the Start Updates and Stop Updates buttons are correctly enabled or disabled.
+            if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
+                mRequestingLocationUpdates = savedInstanceState.getBoolean(
+                        REQUESTING_LOCATION_UPDATES_KEY);
+            }
+
+            // Update the value of mCurrentLocation from the Bundle and update the UI to show the
+            // correct latitude and longitude.
+            if (savedInstanceState.keySet().contains(LOCATION_KEY)) {
+                // Since LOCATION_KEY was found in the Bundle, we can be sure that mCurrentLocation
+                // is not null.
+                mCurrentLocation = savedInstanceState.getParcelable(LOCATION_KEY);
+            }
+
+            // Update the value of mLastUpdateTime from the Bundle and update the UI.
+            if (savedInstanceState.keySet().contains(LAST_UPDATED_TIME_STRING_KEY)) {
+                mLastUpdateTime = savedInstanceState.getString(LAST_UPDATED_TIME_STRING_KEY);
+            }
+            //updateUI();
+        }
+    }
+
+    private void updateCoordinatesFromSharedPreferences() {
+        if (mainActivityPreferences.contains("IsExist")) {
+            if (mCurrentLocation == null) {
+                mCurrentLocation = new Location(STORAGE_SERVICE);
+                mCurrentLocation.setLatitude(Double.parseDouble(mainActivityPreferences.getString("Latitude", "")));
+                mCurrentLocation.setLongitude(Double.parseDouble(mainActivityPreferences.getString("Longitude", "")));
+                mLastUpdateTime = mainActivityPreferences.getString("LastUpdateTime", "");
+            } else {
+                Toast.makeText(this, "mCurrentLocation has already been set!", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void saveCoordinatesToSharedPreferences() {
+        SharedPreferences.Editor edit = mainActivityPreferences.edit();
+        edit.clear();
+        edit.putBoolean("IsExist", true);
+        edit.putString("Latitude", String.valueOf(mCurrentLocation.getLatitude()));
+        edit.putString("Longitude", String.valueOf(mCurrentLocation.getLongitude()));
+        edit.putString("LastUpdateTime", String.valueOf(mLastUpdateTime));
+        edit.commit();
+        Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
+    }
 
     /**
      * Stores activity data in the Bundle.
@@ -363,5 +419,6 @@ public class MainActivity extends FragmentActivity implements
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        updateUI();
     }
 }
