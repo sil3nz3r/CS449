@@ -3,6 +3,7 @@ package edu.umkc.student.tuhvu.wheredidipark;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -11,6 +12,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
@@ -40,6 +42,8 @@ public class LocationService extends Service implements
      */
     public static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+    public static final int TWO_MINUTES = 1000 * 60 * 2;
+    public static final float DESIRED_ACCURACY_DIAMETER = 500.0f;
 
     /**
      * Keys for storing activity state in the Bundle.
@@ -53,77 +57,17 @@ public class LocationService extends Service implements
     protected Location mCurrentLocation;
 
     protected Boolean mRequestingLocationUpdates;
-
     protected String mLastUpdateTime;
+
+    private boolean currentlyProcessingLocation = false;
+
+    private SharedPreferences mySharedPreferences;
 
     @Override
     public void onCreate() {
         super.onCreate();
 
         buildGoogleApiClient();
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_NOT_STICKY;
-    }
-
-    @Override
-    public void onDestroy() {
-
-    }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        Log.i(TAG, "Connected to GoogleApiClient");
-
-        // If the initial location was never previously requested, we use
-        // FusedLocationApi.getLastLocation() to get it. If it was previously requested, we store
-        // its value in the Bundle and check for it in onCreate(). We
-        // do not request it again unless the user specifically requests location updates by pressing
-        // the Start Updates button.
-        //
-        // Because we cache the value of the initial location in the Bundle, it means that if the
-        // user launches the activity,
-        // moves to a new location, and then changes the device orientation, the original location
-        // is displayed as the activity is re-created.
-
-        if (mCurrentLocation == null) {
-
-            mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-            if (mCurrentLocation == null) {
-                Toast.makeText(mCaller, R.string.no_location_detected, Toast.LENGTH_LONG).show();
-            }
-        }
-
-        // If the user presses the Start Updates button before GoogleApiClient connects, we set
-        // mRequestingLocationUpdates to true (see startUpdatesButtonHandler()). Here, we check
-        // the value of mRequestingLocationUpdates and if it is true, we start location updates.
-        if (mRequestingLocationUpdates) {
-            startLocationUpdates();
-        }
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-
     }
 
     /**
@@ -137,8 +81,64 @@ public class LocationService extends Service implements
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
                 .build();
-        // Initialize the LocationRequest object
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!currentlyProcessingLocation) {
+            currentlyProcessingLocation = true;
+            startTracking();
+        }
+        return START_NOT_STICKY;
+    }
+
+    /**
+     * Requests location updates from the FusedLocationApi.
+     */
+    protected void startTracking() {
+        Log.i(TAG, "startTracking");
+
+        if (GooglePlayServicesUtil.isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS) {
+            if (!mGoogleApiClient.isConnected() || !mGoogleApiClient.isConnecting()) {
+                mGoogleApiClient.connect();
+            }
+        } else {
+            Log.e(TAG, "unable to connect to google play services.");
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+    }
+
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Log.i(TAG, "Connected to GoogleApiClient");
+
+        // Initialize LocationRequest object
         createLocationRequest();
+
+        if (mCurrentLocation == null) {
+
+            mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+            mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+            if (mCurrentLocation == null) {
+                Toast.makeText(mCaller, R.string.no_location_detected, Toast.LENGTH_LONG).show();
+            }
+        }
+
+        // The final argument to {@code requestLocationUpdates()} is a LocationListener
+        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
+        if (mGoogleApiClient.isConnected()) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+        }
     }
 
     /**
@@ -155,6 +155,7 @@ public class LocationService extends Service implements
      * updates.
      */
     protected void createLocationRequest() {
+        Log.i(TAG, "createLocationRequest");
         mLocationRequest = new LocationRequest();
 
         // Sets the desired interval for active location updates. This interval is
@@ -169,14 +170,79 @@ public class LocationService extends Service implements
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
-    /**
-     * Requests location updates from the FusedLocationApi.
-     */
-    protected void startLocationUpdates() {
-        // The final argument to {@code requestLocationUpdates()} is a LocationListener
-        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
-        if (mGoogleApiClient.isConnected()) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+    protected boolean isBetterLocation(Location location, Location currentBestLocation) {
+        if (currentBestLocation == null) {
+            // A new location is always better than no location
+            return true;
+        }
+
+        // Check whether the new location fix is newer or older
+        long timeDelta = location.getTime() - currentBestLocation.getTime();
+        boolean isSignificantlyNewer = timeDelta > TWO_MINUTES;
+        boolean isSignificantlyOlder = timeDelta < -TWO_MINUTES;
+        boolean isNewer = timeDelta > 0;
+
+        // If it's been more than two minutes since the current location, use the new location
+        // because the user has likely moved
+        if (isSignificantlyNewer) {
+            return true;
+        }
+        // If the new location is more than two minutes older, it must be worse
+        else if (isSignificantlyOlder) {
+            return false;
+        }
+
+        // Check whether the new location fix is more or less accurate
+        int accuracyDelta = (int) (location.getAccuracy() - currentBestLocation.getAccuracy());
+        boolean isLessAccurate = accuracyDelta > 0;
+        boolean isMoreAccurate = accuracyDelta < 0;
+        boolean isSignificantlyLessAccurate = accuracyDelta > 200;
+
+        // Check if the old and new location are from the same provider
+        boolean isFromSameProvider = isSameProvider(location.getProvider(),
+                currentBestLocation.getProvider());
+
+        // Determine location quality using a combination of timeliness and accuracy
+        if (isMoreAccurate) {
+            return true;
+        } else if (isNewer && !isLessAccurate) {
+            return true;
+        } else if (isNewer && !isSignificantlyLessAccurate && isFromSameProvider) {
+            return true;
+        }
+        return false;
+    }
+
+    /** Checks whether two providers are the same */
+    private boolean isSameProvider(String provider1, String provider2) {
+        if (provider1 == null) {
+            return provider2 == null;
+        }
+        return provider1.equals(provider2);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.i(TAG, "GoogleApiClient connection has been suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        stopLocationUpdates();
+        stopSelf();
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        if (location != null) {
+            Log.i(TAG, "position:" + location.getLatitude() + ", " + location.getLongitude() + "accuracy: " + location.getAccuracy());
+
+            // We have our desired accuracy of so lets quit this service,
+            // onDestroy will be called and stop our location updates
+            if (location.getAccuracy() < DESIRED_ACCURACY_DIAMETER) {
+                stopLocationUpdates();
+                // Update location
+            }
         }
     }
 
@@ -184,13 +250,33 @@ public class LocationService extends Service implements
         // It is a good practice to remove location requests when the activity is in a paused or
         // stopped state. Doing so helps battery performance and is especially
         // recommended in applications that request frequent location updates.
-
-        // The final argument to {@code requestLocationUpdates()} is a LocationListener
-        // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
         LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+            mGoogleApiClient.disconnect();
+        }
     }
 
-    public void getlocation() {
+    private void updateCoordinatesFromSharedPreferences() {
+        if (mySharedPreferences.contains("IsExist")) {
+            if (mCurrentLocation == null) {
+                mCurrentLocation = new Location(STORAGE_SERVICE);
+                mCurrentLocation.setLatitude(Double.parseDouble(mySharedPreferences.getString("Latitude", "")));
+                mCurrentLocation.setLongitude(Double.parseDouble(mySharedPreferences.getString("Longitude", "")));
+                mLastUpdateTime = mySharedPreferences.getString("LastUpdateTime", "");
+            } else {
+                Toast.makeText(this, "mCurrentLocation has already been set!", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
 
+    private void saveCoordinatesToSharedPreferences() {
+        SharedPreferences.Editor edit = mySharedPreferences.edit();
+        edit.clear();
+        edit.putBoolean("IsExist", true);
+        edit.putString("Latitude", String.valueOf(mCurrentLocation.getLatitude()));
+        edit.putString("Longitude", String.valueOf(mCurrentLocation.getLongitude()));
+        edit.putString("LastUpdateTime", String.valueOf(mLastUpdateTime));
+        edit.commit();
+        Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
     }
 }
