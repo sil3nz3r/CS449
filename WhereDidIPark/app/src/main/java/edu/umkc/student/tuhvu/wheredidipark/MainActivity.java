@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -29,7 +30,8 @@ import java.text.DateFormat;
 import java.util.Date;
 
 public class MainActivity extends FragmentActivity implements
-        OnMapReadyCallback {
+        OnMapReadyCallback,
+        GoogleMap.OnMarkerClickListener {
 
     protected static final String TAG = "MainActivity";
 
@@ -37,7 +39,7 @@ public class MainActivity extends FragmentActivity implements
 
     private Marker mMarker;
 
-    private SharedPreferences mainActivityPreferences;
+    private SharedPreferences mySharedPreferences;
 
     private PendingIntent mPendingIntent;
     private AlarmManager mAlarmManager;
@@ -45,12 +47,16 @@ public class MainActivity extends FragmentActivity implements
     LocationService mLocationService;
     boolean mBound = false;
 
+    Location mCurrentLocation;
+    String mLastUpdateTime;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mainActivityPreferences = this.getSharedPreferences(TAG, MODE_PRIVATE);
+        mySharedPreferences = this.getSharedPreferences(TAG, MODE_PRIVATE);
 
         // Initiate Google Maps API
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -59,13 +65,25 @@ public class MainActivity extends FragmentActivity implements
     }
 
     public void ParkButtonHandler(View view) {
-        Location mCurrentLocation = mLocationService.getLocation();
-        updateLocationView(mCurrentLocation, DateFormat.getTimeInstance().format(new Date()));
+        mCurrentLocation = mLocationService.getLocation();
+        mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+        updateLocationView(mCurrentLocation, mLastUpdateTime);
         placeMarKer(mCurrentLocation);
     }
 
     public void ShowParkingButtonHandler(View view) {
+        try {
+            setCoordinatesFromSharedPreferences();
+            placeMarKer(mCurrentLocation);
+        }
+        catch (Resources.NotFoundException eNotFound) {
+            Toast.makeText(this, eNotFound.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
 
+    public void SaveParkingButtonHandler(View view) {
+        saveCoordinatesToSharedPreferences(mCurrentLocation, mLastUpdateTime);
+        view.setVisibility(View.INVISIBLE);
     }
 
     public void updateLocationView(Location location, String lastUpdateTime) {
@@ -92,9 +110,23 @@ public class MainActivity extends FragmentActivity implements
         if (mMarker != null) {
             mMarker.remove();
         }
+
         mMarker = mMap.addMarker(new MarkerOptions().position(mLocationCoor).title(getString(R.string.marker_title)));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(mLocationCoor));
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(mLocationCoor, 15));
+    }
+
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        String selectedTitle = marker.getTitle();
+        String currentTitle = mMarker.getTitle();
+        if (selectedTitle.equals(currentTitle)) {
+            View parking_button = findViewById(R.id.save_location_button);
+            parking_button.setVisibility(View.VISIBLE);
+            return true;
+        }
+
+        return false;
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -122,21 +154,6 @@ public class MainActivity extends FragmentActivity implements
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
 
-    protected void startAlarm() {
-        mAlarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
-        int interval = 10000;
-
-        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval, mPendingIntent);
-        Toast.makeText(this, "Location Service Alarm set", Toast.LENGTH_SHORT).show();
-    }
-
-    public void cancelAlarm() {
-        if (mAlarmManager != null) {
-            mAlarmManager.cancel(mPendingIntent);
-            Toast.makeText(this, "Location Service Alarm canceled", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     @Override
     public void onResume() {
         super.onResume();
@@ -145,7 +162,6 @@ public class MainActivity extends FragmentActivity implements
     @Override
     protected void onPause() {
         super.onPause();
-        //saveCoordinatesToSharedPreferences();
     }
 
     @Override
@@ -156,81 +172,35 @@ public class MainActivity extends FragmentActivity implements
             unbindService(mConnection);
             mBound = false;
         }
-        //this.stopService(new Intent(this, LocationService.class));
-        //cancelAlarm();
-        //saveCoordinatesToSharedPreferences();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        //saveCoordinatesToSharedPreferences();
     }
 
-    /**
-     * Updates fields based on data stored in the bundle.
-     *
-     * @param savedInstanceState The activity state saved in the Bundle.
-     */
-    /*private void updateValuesFromBundle(Bundle savedInstanceState) {
-        Log.i(TAG, "Updating values from bundle");
-        if (savedInstanceState != null) {
-            // Update the value of mRequestingLocationUpdates from the Bundle, and make sure that
-            // the Start Updates and Stop Updates buttons are correctly enabled or disabled.
-            if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
-                mRequestingLocationUpdates = savedInstanceState.getBoolean(
-                        REQUESTING_LOCATION_UPDATES_KEY);
-            }
-
-            // Update the value of mCurrentLocation from the Bundle and update the UI to show the
-            // correct latitude and longitude.
-            if (savedInstanceState.keySet().contains(LOCATION_KEY)) {
-                // Since LOCATION_KEY was found in the Bundle, we can be sure that mCurrentLocation
-                // is not null.
-                mCurrentLocation = savedInstanceState.getParcelable(LOCATION_KEY);
-            }
-
-            // Update the value of mLastUpdateTime from the Bundle and update the UI.
-            if (savedInstanceState.keySet().contains(LAST_UPDATED_TIME_STRING_KEY)) {
-                mLastUpdateTime = savedInstanceState.getString(LAST_UPDATED_TIME_STRING_KEY);
-            }
-            //updateUI();
+    private void setCoordinatesFromSharedPreferences() {
+        if (mySharedPreferences.contains("IsLocationExist")) {
+            mCurrentLocation = new Location(STORAGE_SERVICE);
+            mCurrentLocation.setLatitude(Double.parseDouble(mySharedPreferences.getString("Latitude", "")));
+            mCurrentLocation.setLongitude(Double.parseDouble(mySharedPreferences.getString("Longitude", "")));
+            mLastUpdateTime = mySharedPreferences.getString("LastUpdateTime", "");
+        } else {
+            throw new Resources.NotFoundException("Saved location does not exist. Please locate one!");
         }
-    }*/
+    }
 
-    /*private void updateCoordinatesFromSharedPreferences() {
-        if (mainActivityPreferences.contains("IsExist")) {
-            if (mCurrentLocation == null) {
-                mCurrentLocation = new Location(STORAGE_SERVICE);
-                mCurrentLocation.setLatitude(Double.parseDouble(mainActivityPreferences.getString("Latitude", "")));
-                mCurrentLocation.setLongitude(Double.parseDouble(mainActivityPreferences.getString("Longitude", "")));
-                mLastUpdateTime = mainActivityPreferences.getString("LastUpdateTime", "");
-            } else {
-                Toast.makeText(this, "mCurrentLocation has already been set!", Toast.LENGTH_LONG).show();
-            }
-        }
-    }*/
-
-    /*private void saveCoordinatesToSharedPreferences() {
-        SharedPreferences.Editor edit = mainActivityPreferences.edit();
+    private void saveCoordinatesToSharedPreferences(Location location, String LastUpdateTime) {
+        SharedPreferences.Editor edit = mySharedPreferences.edit();
         edit.clear();
-        edit.putBoolean("IsExist", true);
-        edit.putString("Latitude", String.valueOf(mCurrentLocation.getLatitude()));
-        edit.putString("Longitude", String.valueOf(mCurrentLocation.getLongitude()));
-        edit.putString("LastUpdateTime", String.valueOf(mLastUpdateTime));
+        edit.putBoolean("IsLocationExist", true);
+        edit.putString("Latitude", String.valueOf(location.getLatitude()));
+        edit.putString("Longitude", String.valueOf(location.getLongitude()));
+        edit.putString("LastUpdateTime", String.valueOf(LastUpdateTime));
         edit.commit();
+
         Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
     }
-
-    *//**
-     * Stores activity data in the Bundle.
-     *//*
-    public void onSaveInstanceState(Bundle savedInstanceState) {
-        savedInstanceState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, mRequestingLocationUpdates);
-        savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
-        savedInstanceState.putString(LAST_UPDATED_TIME_STRING_KEY, mLastUpdateTime);
-        super.onSaveInstanceState(savedInstanceState);
-    }*/
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -257,5 +227,6 @@ public class MainActivity extends FragmentActivity implements
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.setOnMarkerClickListener((GoogleMap.OnMarkerClickListener) this);
     }
 }

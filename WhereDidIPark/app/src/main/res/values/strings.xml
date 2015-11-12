@@ -13,6 +13,7 @@
 
     <string name="park_the_car_button">Park Here!</string>
     <string name="show_parking_button">Show Parking Location</string>
+    <string name="save_location_button">Save this location</string>
 
     <string name="last_update_time_label">Last location update time: </string>
 

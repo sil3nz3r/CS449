@@ -81,7 +81,6 @@ public class LocationService extends Service implements
     @Override
     public void onCreate() {
         super.onCreate();
-
         connectGooglePlayService();
     }
 
@@ -92,6 +91,7 @@ public class LocationService extends Service implements
 
     /**
      * On service Start Command
+     *
      * @param intent
      * @param flags
      * @param startId
@@ -109,14 +109,13 @@ public class LocationService extends Service implements
     protected void connectGooglePlayService() {
         Log.i(TAG, "connectGooglePlayService");
 
-        buildGoogleApiClient();
+        if (mGoogleApiClient == null) {
+            buildGoogleApiClient();
+        }
 
-        if (GooglePlayServicesUtil.isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS) {
-            if (!mGoogleApiClient.isConnected() || !mGoogleApiClient.isConnecting()) {
-                mGoogleApiClient.connect();
-            }
-        } else {
-            Log.e(TAG, "unable to connect to google play services.");
+        assert GooglePlayServicesUtil.isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS : "Google Play Services is not available";
+        if (!mGoogleApiClient.isConnected() || !mGoogleApiClient.isConnecting()) {
+            mGoogleApiClient.connect();
         }
     }
 
@@ -132,7 +131,7 @@ public class LocationService extends Service implements
     }
 
     /**
-     * Builds a GoogleApiClient. Uses the {@code #addApi} method to request the
+     * Builds a GoogleApiClient object. Uses the {@code #addApi} method to request the
      * LocationServices API.
      */
     protected synchronized void buildGoogleApiClient() {
@@ -146,6 +145,7 @@ public class LocationService extends Service implements
 
     @Override
     public void onDestroy() {
+        disconnectGooglePlayService();
         super.onDestroy();
     }
 
@@ -159,11 +159,16 @@ public class LocationService extends Service implements
         // The final argument to {@code requestLocationUpdates()} is a LocationListener
         // (http://developer.android.com/reference/com/google/android/gms/location/LocationListener.html).
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+
+        Location mTempLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+
+        assert mTempLocation != null : R.string.no_location_detected;
+        updateLocation(mTempLocation);
+    }
+
+    private void updateLocation(Location location) {
+        mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        if (mCurrentLocation == null) {
-            Log.i(TAG, getString(R.string.no_location_detected));
-        }
     }
 
     /**
@@ -209,21 +214,24 @@ public class LocationService extends Service implements
 
     @Override
     public void onLocationChanged(Location location) {
+        assert mGoogleApiClient != null && mGoogleApiClient.isConnected() : "Google API Client is in bad state";
+
         if (location != null) {
             Log.i(TAG, "position:" + location.getLatitude() + ", " + location.getLongitude() + "accuracy: " + location.getAccuracy());
 
-            // We have our desired accuracy of so lets quit this service,
-            // onDestroy will be called and stop our location updates
-            if (location.getAccuracy() < DESIRED_ACCURACY_DIAMETER) {
-                disconnectGooglePlayService();
-                // Update location
-            }
+//            // We have our desired accuracy of so lets quit this service,
+//            // onDestroy will be called and stop our location updates
+//            if (location.getAccuracy() < DESIRED_ACCURACY_DIAMETER) {
+//                disconnectGooglePlayService();
+//                // Update location
+//            }
         }
     }
 
     /*Method for clients*/
     public Location getLocation() {
-        if (mCurrentLocation == null) {
+        if (mCurrentLocation != null) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
             mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         }
         return mCurrentLocation;
@@ -282,27 +290,27 @@ public class LocationService extends Service implements
         return provider1.equals(provider2);
     }
 
-    private void updateCoordinatesFromSharedPreferences() {
-        if (mySharedPreferences.contains("IsExist")) {
-            if (mCurrentLocation == null) {
-                mCurrentLocation = new Location(STORAGE_SERVICE);
-                mCurrentLocation.setLatitude(Double.parseDouble(mySharedPreferences.getString("Latitude", "")));
-                mCurrentLocation.setLongitude(Double.parseDouble(mySharedPreferences.getString("Longitude", "")));
-                mLastUpdateTime = mySharedPreferences.getString("LastUpdateTime", "");
-            } else {
-                Toast.makeText(this, "mCurrentLocation has already been set!", Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
-    private void saveCoordinatesToSharedPreferences() {
-        SharedPreferences.Editor edit = mySharedPreferences.edit();
-        edit.clear();
-        edit.putBoolean("IsExist", true);
-        edit.putString("Latitude", String.valueOf(mCurrentLocation.getLatitude()));
-        edit.putString("Longitude", String.valueOf(mCurrentLocation.getLongitude()));
-        edit.putString("LastUpdateTime", String.valueOf(mLastUpdateTime));
-        edit.commit();
-        Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
-    }
+//    private void updateCoordinatesFromSharedPreferences() {
+//        if (mySharedPreferences.contains("IsExist")) {
+//            if (mCurrentLocation == null) {
+//                mCurrentLocation = new Location(STORAGE_SERVICE);
+//                mCurrentLocation.setLatitude(Double.parseDouble(mySharedPreferences.getString("Latitude", "")));
+//                mCurrentLocation.setLongitude(Double.parseDouble(mySharedPreferences.getString("Longitude", "")));
+//                mLastUpdateTime = mySharedPreferences.getString("LastUpdateTime", "");
+//            } else {
+//                Toast.makeText(this, "mCurrentLocation has already been set!", Toast.LENGTH_LONG).show();
+//            }
+//        }
+//    }
+//
+//    private void saveCoordinatesToSharedPreferences() {
+//        SharedPreferences.Editor edit = mySharedPreferences.edit();
+//        edit.clear();
+//        edit.putBoolean("IsExist", true);
+//        edit.putString("Latitude", String.valueOf(mCurrentLocation.getLatitude()));
+//        edit.putString("Longitude", String.valueOf(mCurrentLocation.getLongitude()));
+//        edit.putString("LastUpdateTime", String.valueOf(mLastUpdateTime));
+//        edit.commit();
+//        Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
+//    }
 }

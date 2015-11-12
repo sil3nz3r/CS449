@@ -93,9 +93,20 @@
         android:layout_height="wrap_content"
         android:text="@string/show_parking_button"
         android:id="@+id/show_parking_button"
+        android:onClick="ShowParkingButtonHandler"
+        android:layout_alignTop="@+id/clear_map_button"
+        android:layout_toRightOf="@+id/clear_map_button"
+        android:layout_toEndOf="@+id/clear_map_button" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/save_location_button"
+        android:id="@+id/save_location_button"
+        android:onClick="SaveParkingButtonHandler"
         android:layout_alignParentBottom="true"
         android:layout_toRightOf="@+id/start_updates_button"
         android:layout_toEndOf="@+id/start_updates_button"
-        android:onClick="ShowParkingButtonHandler" />
+        android:visibility="invisible"/>
 
 </RelativeLayout>
