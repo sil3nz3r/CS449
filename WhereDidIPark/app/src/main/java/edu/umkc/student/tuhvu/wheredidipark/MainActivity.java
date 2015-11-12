@@ -2,25 +2,21 @@ package edu.umkc.student.tuhvu.wheredidipark;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.location.Location;
-import android.nfc.Tag;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.v4.app.FragmentActivity;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -44,7 +40,10 @@ public class MainActivity extends FragmentActivity implements
     private SharedPreferences mainActivityPreferences;
 
     private PendingIntent mPendingIntent;
-    private AlarmManager mAlartmManager;
+    private AlarmManager mAlarmManager;
+
+    LocationService mLocationService;
+    boolean mBound = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,47 +56,83 @@ public class MainActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-        // Retrieve a PendingIntent that will perform a broadcast
-        Intent alarmIntent = new Intent(this, LocationServiceAlarmReceiver.class);
-        mPendingIntent = PendingIntent.getBroadcast(this, 0, alarmIntent, 0);
     }
 
     public void ParkButtonHandler(View view) {
+        Location mCurrentLocation = mLocationService.getLocation();
+        updateLocationView(mCurrentLocation, DateFormat.getTimeInstance().format(new Date()));
+        placeMarKer(mCurrentLocation);
+    }
+
+    public void ShowParkingButtonHandler(View view) {
+
+    }
+
+    public void updateLocationView(Location location, String lastUpdateTime) {
+        TextView mLastUpdateTimeTextView;
+        TextView mLatitudeTextView;
+        TextView mLongitudeTextView;
+
+        mLatitudeTextView = (TextView) findViewById(R.id.latitude_text);
+        mLongitudeTextView = (TextView) findViewById(R.id.longitude_text);
+        mLastUpdateTimeTextView = (TextView) findViewById(R.id.last_update_time_text);
+
+        mLatitudeTextView.setText(String.valueOf(location.getLatitude()));
+        mLongitudeTextView.setText(String.valueOf(location.getLongitude()));
+        mLastUpdateTimeTextView.setText(lastUpdateTime);
     }
 
     public void ClearMapButtonHandler(View view) {
         mMap.clear();
     }
 
-    /*private void placeMarKer() {
+    private void placeMarKer(Location location) {
         // Update map
-        LatLng mLocationCoor = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+        LatLng mLocationCoor = new LatLng(location.getLatitude(), location.getLongitude());
         if (mMarker != null) {
             mMarker.remove();
         }
         mMarker = mMap.addMarker(new MarkerOptions().position(mLocationCoor).title(getString(R.string.marker_title)));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(mLocationCoor));
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(mLocationCoor, 15));
-    }*/
+    }
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            // We've bound to LocationService, cast the Ibinder and get LocationService instance
+            LocationService.LocalBinder binder = (LocationService.LocalBinder) service;
+            mLocationService = binder.getService();
+            mBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mBound = false;
+        }
+    };
 
     @Override
     protected void onStart() {
         super.onStart();
-        startAlarm();
+        //startAlarm();
+        /*Toast.makeText(this, "Location Service started", Toast.LENGTH_SHORT).show();
+        this.startService(new Intent(this, LocationService.class));*/
+        Intent intent = new Intent(this, LocationService.class);
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
 
     protected void startAlarm() {
-        mAlartmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
+        mAlarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
         int interval = 10000;
 
-        mAlartmManager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval, mPendingIntent);
+        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval, mPendingIntent);
         Toast.makeText(this, "Location Service Alarm set", Toast.LENGTH_SHORT).show();
     }
 
     public void cancelAlarm() {
-        if (mAlartmManager != null) {
-            mAlartmManager.cancel(mPendingIntent);
+        if (mAlarmManager != null) {
+            mAlarmManager.cancel(mPendingIntent);
             Toast.makeText(this, "Location Service Alarm canceled", Toast.LENGTH_SHORT).show();
         }
     }
@@ -116,7 +151,13 @@ public class MainActivity extends FragmentActivity implements
     @Override
     protected void onStop() {
         super.onStop();
-        cancelAlarm();
+        Toast.makeText(this, "Location Service stopped", Toast.LENGTH_SHORT).show();
+        if (mBound) {
+            unbindService(mConnection);
+            mBound = false;
+        }
+        //this.stopService(new Intent(this, LocationService.class));
+        //cancelAlarm();
         //saveCoordinatesToSharedPreferences();
     }
 

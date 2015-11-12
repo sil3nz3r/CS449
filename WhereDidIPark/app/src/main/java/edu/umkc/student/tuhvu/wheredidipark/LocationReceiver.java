@@ -8,11 +8,11 @@ import android.widget.Toast;
 /**
  * Created by tuvu on 11/8/2015.
  */
-public class LocationServiceAlarmReceiver extends BroadcastReceiver {
-    private static final String TAG = "LocationServiceAlarmReceiver";
+public class LocationReceiver extends BroadcastReceiver {
+    private static final String TAG = "LocationReceiver";
     @Override
     public void onReceive(Context context, Intent intent) {
-        Toast.makeText(context, "", Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, "Location Service Alarm initialized", Toast.LENGTH_SHORT).show();
         context.startService(new Intent(context, LocationService.class));
     }
 }
