@@ -11,6 +11,7 @@ import android.content.res.Resources;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -72,13 +73,16 @@ public class MainActivity extends FragmentActivity implements
     }
 
     public void ShowParkingButtonHandler(View view) {
-        try {
-            setCoordinatesFromSharedPreferences();
-            placeMarKer(mCurrentLocation);
-        }
-        catch (Resources.NotFoundException eNotFound) {
-            Toast.makeText(this, eNotFound.getMessage(), Toast.LENGTH_LONG).show();
-        }
+//        try {
+//            setCoordinatesFromSharedPreferences();
+//            placeMarKer(mCurrentLocation);
+//        }
+//        catch (Resources.NotFoundException eNotFound) {
+//            Toast.makeText(this, eNotFound.getMessage(), Toast.LENGTH_LONG).show();
+//        }
+
+        DialogFragment newFragment = new SavedLocationDialog();
+        newFragment.show(getSupportFragmentManager(), "colors");
     }
 
     public void SaveParkingButtonHandler(View view) {
