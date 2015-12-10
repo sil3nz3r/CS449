@@ -21,4 +21,7 @@
 
     <!--Map related strings-->
     <string name="marker_title">Your car is here!</string>
+
+    <!--SavedLocationDialog-->
+    <string name="saved_location_dialog_tag">SavedLocationDialog</string>
 </resources>

@@ -82,12 +82,12 @@ public class MainActivity extends FragmentActivity implements
 //        }
 
         DialogFragment newFragment = new SavedLocationDialog();
-        newFragment.show(getSupportFragmentManager(), "colors");
+        newFragment.show(getSupportFragmentManager(), String.valueOf(R.string.saved_location_dialog_tag));
     }
 
     public void SaveParkingButtonHandler(View view) {
-        saveCoordinatesToSharedPreferences(mCurrentLocation, mLastUpdateTime);
-        view.setVisibility(View.INVISIBLE);
+        DialogFragment newFragment = new SavedLocationDialog();
+        newFragment.show(getSupportFragmentManager(), String.valueOf(R.string.saved_location_dialog_tag));
     }
 
     public void updateLocationView(Location location, String lastUpdateTime) {
