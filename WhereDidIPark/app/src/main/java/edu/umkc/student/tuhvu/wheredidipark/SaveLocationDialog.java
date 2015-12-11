@@ -39,7 +39,6 @@ public class SaveLocationDialog extends DialogFragment {
 
     private void saveLocationToSharedPreferences(Location location, int index) {
         SharedPreferences.Editor edit = mLocationSharedPreferences.edit();
-        edit.clear();
         edit.putBoolean(String.valueOf(index) + "IsLocationExist", true);
         edit.putLong(String.valueOf(index) + "Latitude", Double.doubleToLongBits(location.getLatitude()));
         edit.putLong(String.valueOf(index) + "Longitude", Double.doubleToLongBits(location.getLongitude()));
