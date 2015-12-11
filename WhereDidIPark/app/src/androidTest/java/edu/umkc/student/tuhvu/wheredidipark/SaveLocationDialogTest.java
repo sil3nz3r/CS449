@@ -11,12 +11,12 @@ import android.widget.Button;
 /**
  * Created by TV020594 on 11/28/2015.
  */
-public class SavedLocationDialogTest extends ActivityInstrumentationTestCase2<MainActivity> {
+public class SaveLocationDialogTest extends ActivityInstrumentationTestCase2<MainActivity> {
 
     private MainActivity activity;
-    private static final String KEY_SP_PACKAGE = "SavedLocationDialogTest";
+    private static final String KEY_SP_PACKAGE = "SaveLocationDialogTest";
 
-    public SavedLocationDialogTest() {
+    public SaveLocationDialogTest() {
         super(MainActivity.class);
     }
 

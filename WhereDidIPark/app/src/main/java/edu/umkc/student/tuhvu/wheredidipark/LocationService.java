@@ -218,13 +218,6 @@ public class LocationService extends Service implements
 
         if (location != null) {
             Log.i(TAG, "position:" + location.getLatitude() + ", " + location.getLongitude() + "accuracy: " + location.getAccuracy());
-
-//            // We have our desired accuracy of so lets quit this service,
-//            // onDestroy will be called and stop our location updates
-//            if (location.getAccuracy() < DESIRED_ACCURACY_DIAMETER) {
-//                disconnectGooglePlayService();
-//                // Update location
-//            }
         }
     }
 

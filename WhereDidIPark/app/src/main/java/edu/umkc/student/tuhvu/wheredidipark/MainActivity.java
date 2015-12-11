@@ -27,9 +27,6 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import java.text.DateFormat;
-import java.util.Date;
-
 public class MainActivity extends FragmentActivity implements
         OnMapReadyCallback,
         GoogleMap.OnMarkerClickListener {
@@ -42,15 +39,24 @@ public class MainActivity extends FragmentActivity implements
 
     private SharedPreferences mySharedPreferences;
 
-    private PendingIntent mPendingIntent;
-    private AlarmManager mAlarmManager;
-
     LocationService mLocationService;
     boolean mBound = false;
 
-    Location mCurrentLocation;
-    String mLastUpdateTime;
+    private Location mCurrentLocation;
 
+    public Location getCurrentLocation() {
+        setCurrentLocation(mLocationService.getLocation());
+        return mCurrentLocation;
+    }
+
+    public void setCurrentLocation(Location location) {
+        mCurrentLocation = location;
+        placeMarKer(mCurrentLocation);
+    }
+
+    View parking_button;
+
+    public String mLastUpdateTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +64,7 @@ public class MainActivity extends FragmentActivity implements
         setContentView(R.layout.activity_main);
 
         mySharedPreferences = this.getSharedPreferences(TAG, MODE_PRIVATE);
+        parking_button = findViewById(R.id.save_location_button);
 
         // Initiate Google Maps API
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -66,28 +73,17 @@ public class MainActivity extends FragmentActivity implements
     }
 
     public void ParkButtonHandler(View view) {
-        mCurrentLocation = mLocationService.getLocation();
-        mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        updateLocationView(mCurrentLocation, mLastUpdateTime);
-        placeMarKer(mCurrentLocation);
+        updateLocationView(getCurrentLocation(), Helper.formatDate(getCurrentLocation().getTime()));
     }
 
     public void ShowParkingButtonHandler(View view) {
-//        try {
-//            setCoordinatesFromSharedPreferences();
-//            placeMarKer(mCurrentLocation);
-//        }
-//        catch (Resources.NotFoundException eNotFound) {
-//            Toast.makeText(this, eNotFound.getMessage(), Toast.LENGTH_LONG).show();
-//        }
-
         DialogFragment newFragment = new SavedLocationDialog();
         newFragment.show(getSupportFragmentManager(), String.valueOf(R.string.saved_location_dialog_tag));
     }
 
     public void SaveParkingButtonHandler(View view) {
-        DialogFragment newFragment = new SavedLocationDialog();
-        newFragment.show(getSupportFragmentManager(), String.valueOf(R.string.saved_location_dialog_tag));
+        DialogFragment newFragment = new SaveLocationDialog();
+        newFragment.show(getSupportFragmentManager(), String.valueOf(R.string.save_location_dialog_tag));
     }
 
     public void updateLocationView(Location location, String lastUpdateTime) {
@@ -106,6 +102,7 @@ public class MainActivity extends FragmentActivity implements
 
     public void ClearMapButtonHandler(View view) {
         mMap.clear();
+        parking_button.setVisibility(View.INVISIBLE);
     }
 
     private void placeMarKer(Location location) {
@@ -125,7 +122,6 @@ public class MainActivity extends FragmentActivity implements
         String selectedTitle = marker.getTitle();
         String currentTitle = mMarker.getTitle();
         if (selectedTitle.equals(currentTitle)) {
-            View parking_button = findViewById(R.id.save_location_button);
             parking_button.setVisibility(View.VISIBLE);
             return true;
         }
@@ -151,9 +147,7 @@ public class MainActivity extends FragmentActivity implements
     @Override
     protected void onStart() {
         super.onStart();
-        //startAlarm();
-        /*Toast.makeText(this, "Location Service started", Toast.LENGTH_SHORT).show();
-        this.startService(new Intent(this, LocationService.class));*/
+        Toast.makeText(this, "Location Service started", Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(this, LocationService.class);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
@@ -181,29 +175,6 @@ public class MainActivity extends FragmentActivity implements
     @Override
     protected void onDestroy() {
         super.onDestroy();
-    }
-
-    private void setCoordinatesFromSharedPreferences() {
-        if (mySharedPreferences.contains("IsLocationExist")) {
-            mCurrentLocation = new Location(STORAGE_SERVICE);
-            mCurrentLocation.setLatitude(Double.parseDouble(mySharedPreferences.getString("Latitude", "")));
-            mCurrentLocation.setLongitude(Double.parseDouble(mySharedPreferences.getString("Longitude", "")));
-            mLastUpdateTime = mySharedPreferences.getString("LastUpdateTime", "");
-        } else {
-            throw new Resources.NotFoundException("Saved location does not exist. Please locate one!");
-        }
-    }
-
-    private void saveCoordinatesToSharedPreferences(Location location, String LastUpdateTime) {
-        SharedPreferences.Editor edit = mySharedPreferences.edit();
-        edit.clear();
-        edit.putBoolean("IsLocationExist", true);
-        edit.putString("Latitude", String.valueOf(location.getLatitude()));
-        edit.putString("Longitude", String.valueOf(location.getLongitude()));
-        edit.putString("LastUpdateTime", String.valueOf(LastUpdateTime));
-        edit.commit();
-
-        Toast.makeText(this, "location coordinates are saved", Toast.LENGTH_SHORT).show();
     }
 
     @Override

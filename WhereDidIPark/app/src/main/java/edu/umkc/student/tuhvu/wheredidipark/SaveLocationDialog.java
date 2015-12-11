@@ -4,7 +4,6 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
-import android.content.res.Resources;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.v4.app.DialogFragment;
@@ -12,10 +11,16 @@ import android.support.v7.app.AlertDialog;
 import android.widget.Toast;
 
 /**
- * Created by Sil3nz3r on 12/01/2015.
+ * Created by TV020594 on 11/30/2015.
  */
-public class SavedLocationDialog extends DialogFragment {
+public class SaveLocationDialog extends DialogFragment {
     private SharedPreferences mLocationSharedPreferences;
+
+//    static SaveLocationDialog newInstance(Location locationData) {
+//        SaveLocationDialog dialog = new SaveLocationDialog();
+//
+//        Bundle args = new Bundle();
+//    }
 
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
@@ -26,23 +31,21 @@ public class SavedLocationDialog extends DialogFragment {
                 .setItems(new String[]{"Location 1", "Location 2", "Location 3"},
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int index) {
-                                retrieveLocationFromSharedPreferences(index);
+                                saveLocationToSharedPreferences(((MainActivity) getActivity()).getCurrentLocation(), index);
                             }
                         });
         return builder.create();
     }
 
-    private void retrieveLocationFromSharedPreferences(int index) {
-        Location location = new Location(String.valueOf(R.string.shared_preferences_service));
+    private void saveLocationToSharedPreferences(Location location, int index) {
+        SharedPreferences.Editor edit = mLocationSharedPreferences.edit();
+        edit.clear();
+        edit.putBoolean(String.valueOf(index) + "IsLocationExist", true);
+        edit.putLong(String.valueOf(index) + "Latitude", Double.doubleToLongBits(location.getLatitude()));
+        edit.putLong(String.valueOf(index) + "Longitude", Double.doubleToLongBits(location.getLongitude()));
+        edit.putLong(String.valueOf(index) + "LastUpdateTime", location.getTime());
+        edit.commit();
 
-        if (mLocationSharedPreferences.contains(String.valueOf(index) + "IsLocationExist")) {
-
-            location.setLatitude(Double.longBitsToDouble(mLocationSharedPreferences.getLong(String.valueOf(index) + "Latitude", 0L)));
-            location.setLongitude(Double.longBitsToDouble(mLocationSharedPreferences.getLong(String.valueOf(index) + "Longitude", 0L)));
-            location.setTime(mLocationSharedPreferences.getLong(String.valueOf(index) + "LastUpdateTime", 0L));
-            ((MainActivity)getActivity()).setCurrentLocation(location);
-        } else {
-            Toast.makeText(getActivity(), "Saved location is empty.", Toast.LENGTH_SHORT).show();
-        }
+        Toast.makeText(getActivity(), "location coordinates are saved.", Toast.LENGTH_SHORT).show();
     }
 }

@@ -22,6 +22,11 @@
     <!--Map related strings-->
     <string name="marker_title">Your car is here!</string>
 
-    <!--SavedLocationDialog-->
+    <!--Location Dialog-->
+    <string name="save_location_dialog_tag">SaveLocationDialog</string>
     <string name="saved_location_dialog_tag">SavedLocationDialog</string>
+
+    <string name="location_shared_preferences_name">SavedLocation</string>
+    
+    <string name="shared_preferences_service">shared_preferences</string>
 </resources>
